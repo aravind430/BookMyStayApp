@@ -44,7 +44,7 @@ class RoomInventory {
 }
 
 // --- Main Application Class ---
-public class UseCase3InventorySetup {
+public class BookMystayApp {
 
     public static void main(String[] args) {
         System.out.println("*************************************************");
