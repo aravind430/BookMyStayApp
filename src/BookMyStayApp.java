@@ -1,87 +1,67 @@
 import java.util.*;
 
-// Class representing a complete Reservation record for history
-class Reservation {
-    String reservationId;
-    String roomType;
-    String roomId;
-    List<String> services;
-    double totalCost;
-
-    public Reservation(String reservationId, String roomType, String roomId, List<String> services, double totalCost) {
-        this.reservationId = reservationId;
-        this.roomType = roomType;
-        this.roomId = roomId;
-        this.services = services;
-        this.totalCost = totalCost;
-    }
-
-    @Override
-    public String toString() {
-        return String.format("ID: %-15s | Type: %-8s | Room: %-10s | Cost: $%-6.2f | Services: %s",
-                reservationId, roomType, roomId, totalCost, services);
-    }
-}
-
 public class BookMyStayApp {
 
-    // List to maintain historical records in insertion order (Audit Trail)
-    private List<Reservation> bookingHistory = new ArrayList<>();
+    // Simulating the system state from previous Use Cases
+    private Map<String, Integer> inventory = new HashMap<>();
+    private Map<String, String> activeBookings = new HashMap<>(); // ResID -> RoomType
 
-    /**
-     * Records a confirmed reservation into history.
-     * Demonstrates Persistence Mindset and Ordered Storage.
-     */
-    public void recordReservation(String id, String type, String room, List<String> addons, double cost) {
-        Reservation record = new Reservation(id, type, room, addons, cost);
-        bookingHistory.add(record);
-        System.out.println("LOG: Reservation " + id + " saved to history.");
+    // Stack to handle LIFO Rollback for released Room IDs
+    private Stack<String> releasedRoomIds = new Stack<>();
+
+    public UseCase10BookingCancellation() {
+        // Setup initial state: 1 Deluxe room booked, 0 currently available
+        inventory.put("Deluxe", 0);
+        activeBookings.put("RES-101", "Deluxe");
+
+        System.out.println("Initial State: 1 Deluxe room booked (RES-101), Inventory: 0");
     }
 
     /**
-     * Generates a summary report for the administrator.
-     * Demonstrates Reporting Readiness and Operational Visibility.
+     * Performs a controlled rollback of a booking.
+     * Demonstrates State Reversal and Inventory Restoration.
      */
-    public void generateReport() {
-        System.out.println("\n========================================================");
-        System.out.println("        OFFICIAL BOOKING HISTORY REPORT                ");
-        System.out.println("========================================================");
+    public void cancelBooking(String reservationId, String roomId) {
+        System.out.println("\n--- Initiating Cancellation for: " + reservationId + " ---");
 
-        if (bookingHistory.isEmpty()) {
-            System.out.println("No records found.");
-        } else {
-            double totalRevenue = 0;
-            for (Reservation res : bookingHistory) {
-                System.out.println(res);
-                totalRevenue += res.totalCost;
-            }
-            System.out.println("--------------------------------------------------------");
-            System.out.println("Total Reservations processed: " + bookingHistory.size());
-            System.out.printf("Total Revenue Generated:      $%.2f\n", totalRevenue);
+        // 1. Validation of Cancellation Request
+        if (!activeBookings.containsKey(reservationId)) {
+            System.out.println("ERROR: Cancellation failed. Reservation ID " + reservationId + " not found.");
+            return;
         }
-        System.out.println("========================================================\n");
+
+        // 2. Identify Room Type for Inventory Restoration
+        String roomType = activeBookings.get(reservationId);
+
+        // 3. LIFO Rollback Logic: Push released Room ID to Stack
+        releasedRoomIds.push(roomId);
+        System.out.println("LOG: Room ID " + roomId + " pushed to rollback stack.");
+
+        // 4. Inventory Restoration: Increment count immediately
+        inventory.put(roomType, inventory.get(roomType) + 1);
+
+        // 5. Controlled Mutation: Remove from active records
+        activeBookings.remove(reservationId);
+
+        System.out.println("SUCCESS: Reservation " + reservationId + " cancelled.");
+        System.out.println("Inventory for " + roomType + " restored to: " + inventory.get(roomType));
+    }
+
+    public void showRollbackStatus() {
+        System.out.println("\n--- Current System Recovery State ---");
+        System.out.println("Rooms available for re-assignment (Stack): " + releasedRoomIds);
+        System.out.println("Active Bookings remaining: " + activeBookings.size());
+        System.out.println("-------------------------------------");
     }
 
     public static void main(String[] args) {
-        UseCase8BookingHistoryReport reportService = new UseCase8BookingHistoryReport();
+        UseCase10BookingCancellation service = new UseCase10BookingCancellation();
 
-        // Simulating the recording of several completed bookings
-        reportService.recordReservation(
-                "RES-101", "Deluxe", "DEL-101",
-                Arrays.asList("Breakfast", "WiFi"), 180.0
-        );
+        // Scenario 1: Valid Cancellation
+        service.cancelBooking("RES-101", "DELUXE-101");
+        service.showRollbackStatus();
 
-        reportService.recordReservation(
-                "RES-102", "Suite", "SUI-201",
-                Arrays.asList("Spa", "Gym"), 450.0
-        );
-
-        reportService.recordReservation(
-                "RES-103", "Deluxe", "DEL-102",
-                new ArrayList<>(), 150.0
-        );
-
-        // Administrator requests the report
-        reportService.generateReport();
+        // Scenario 2: Invalid Cancellation (Non-existent ID)
+        service.cancelBooking("RES-999", "NONE-000");
     }
 }
