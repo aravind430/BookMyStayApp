@@ -16,7 +16,7 @@ class Service {
     }
 }
 
-public class UseCase7AddOnServiceSelection {
+public class BookMyStayApp {
 
     // One-to-Many Relationship: Map reservation ID to a list of services
     private Map<String, List<Service>> reservationAddOns = new HashMap<>();
