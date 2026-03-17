@@ -1,73 +1,106 @@
+import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
+
+// The Reservation class must implement Serializable to be saved to a file
+class PersistentReservation implements Serializable {
+    private static final long serialVersionUID = 1L;
+    String id;
+    String roomType;
+
+    public PersistentReservation(String id, String roomType) {
+        this.id = id;
+        this.roomType = roomType;
+    }
+
+    @Override
+    public String toString() {
+        return "ID: " + id + " [" + roomType + "]";
+    }
+}
 
 public class BookMyStayApp {
 
-    // Shared mutable state: Inventory
-    private int availableRooms = 5;
+    private static final String STORAGE_FILE = "hotel_state.ser";
 
-    // Thread-safe collection for requests
-    private BlockingQueue<String> bookingQueue = new LinkedBlockingQueue<>();
+    // System state to persist
+    private Map<String, Integer> inventory = new HashMap<>();
+    private List<PersistentReservation> history = new ArrayList<>();
 
-    // List to track successful allocations
-    private List<String> confirmedAllocations = Collections.synchronizedList(new ArrayList<>());
+    public UseCase12DataPersistenceRecovery() {
+        // Default initial state if no file exists
+        inventory.put("Deluxe", 10);
+        inventory.put("Suite", 5);
+    }
 
     /**
-     * The processBooking method represents the Critical Section.
-     * Synchronized ensures only one thread can modify inventory at a time.
+     * Serialization: Saves system state to a file.
      */
-    public synchronized void processBooking(String guestName) {
-        System.out.println(Thread.currentThread().getName() + " is attempting to book for: " + guestName);
-
-        // Check inventory within the synchronized block to prevent Race Conditions
-        if (availableRooms > 0) {
-            // Simulate a small processing delay to highlight potential race conditions if unsynchronized
-            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-
-            availableRooms--;
-            confirmedAllocations.add(guestName + " (Room #" + (5 - availableRooms) + ")");
-            System.out.println("SUCCESS: " + guestName + " secured a room. Rooms left: " + availableRooms);
-        } else {
-            System.out.println("FAILED: No rooms left for " + guestName);
+    public void saveSystemState() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(STORAGE_FILE))) {
+            oos.writeObject(inventory);
+            oos.writeObject(history);
+            System.out.println("LOG: System state successfully persisted to " + STORAGE_FILE);
+        } catch (IOException e) {
+            System.err.println("ERROR: Failed to save state: " + e.getMessage());
         }
     }
 
-    public void startSimulation() {
-        // Create a thread pool to simulate concurrent guests
-        ExecutorService executor = Executors.newFixedThreadPool(3);
-
-        String[] guests = {"Alice", "Bob", "Charlie", "David", "Eve", "Frank"};
-
-        System.out.println("--- Starting Concurrent Simulation (5 Rooms, 6 Guests) ---");
-
-        for (String guest : guests) {
-            // Each guest request is handled by a separate thread
-            executor.execute(() -> {
-                processBooking(guest);
-            });
+    /**
+     * Deserialization: Restores system state from a file.
+     */
+    @SuppressWarnings("unchecked")
+    public void loadSystemState() {
+        File file = new File(STORAGE_FILE);
+        if (!file.exists()) {
+            System.out.println("LOG: No persistence file found. Starting with fresh state.");
+            return;
         }
 
-        executor.shutdown();
-        try {
-            // Wait for all threads to finish
-            if (executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                printFinalReport();
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(STORAGE_FILE))) {
+            inventory = (Map<String, Integer>) ois.readObject();
+            history = (List<PersistentReservation>) ois.readObject();
+            System.out.println("LOG: System state recovered successfully.");
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("ERROR: Recovery failed. File might be corrupted: " + e.getMessage());
         }
     }
 
-    private void printFinalReport() {
-        System.out.println("\n--- Final Allocation Report ---");
-        System.out.println("Confirmed Bookings: " + confirmedAllocations);
-        System.out.println("Final Inventory Count: " + availableRooms);
-        System.out.println("System Integrity: " + (availableRooms >= 0 ? "PASSED" : "FAILED"));
-        System.out.println("--------------------------------");
+    public void addBooking(String id, String type) {
+        if (inventory.getOrDefault(type, 0) > 0) {
+            inventory.put(type, inventory.get(type) - 1);
+            history.add(new PersistentReservation(id, type));
+            System.out.println("SUCCESS: Added booking " + id);
+        }
+    }
+
+    public void showStatus() {
+        System.out.println("--- Current System State ---");
+        System.out.println("Inventory: " + inventory);
+        System.out.println("Total Bookings in History: " + history.size());
+        System.out.println("----------------------------");
     }
 
     public static void main(String[] args) {
-        UseCase11ConcurrentBookingSimulation simulation = new UseCase11ConcurrentBookingSimulation();
-        simulation.startSimulation();
+        UseCase12DataPersistenceRecovery app = new UseCase12DataPersistenceRecovery();
+
+        // 1. Attempt to recover previous state
+        app.loadSystemState();
+        app.showStatus();
+
+        // 2. Perform some operations
+        if (app.history.isEmpty()) {
+            System.out.println("Simulating first-time run...");
+            app.addBooking("RES-001", "Deluxe");
+            app.addBooking("RES-002", "Suite");
+        } else {
+            System.out.println("Simulating post-restart run...");
+            app.addBooking("RES-00" + (app.history.size() + 1), "Deluxe");
+        }
+
+        // 3. Persist before shutdown
+        app.saveSystemState();
+        app.showStatus();
+
+        System.out.println("\nApplication shutting down. Run again to see recovered state!");
     }
 }
