@@ -23,65 +23,65 @@ class Reservation {
     }
 }
 
-public class BookMyStayApp {
+public class BookMyStayApp import java.util.*;
 
-    // List to maintain historical records in insertion order (Audit Trail)
-    private List<Reservation> bookingHistory = new ArrayList<>();
+// Custom Exception for Domain-Specific Errors
+class BookingException extends Exception {
+    public BookingException(String message) {
+        super(message);
+    }
+}
 
-    /**
-     * Records a confirmed reservation into history.
-     * Demonstrates Persistence Mindset and Ordered Storage.
-     */
-    public void recordReservation(String id, String type, String room, List<String> addons, double cost) {
-        Reservation record = new Reservation(id, type, room, addons, cost);
-        bookingHistory.add(record);
-        System.out.println("LOG: Reservation " + id + " saved to history.");
+public class UseCase9ErrorHandlingValidation {
+
+    private Map<String, Integer> inventory = new HashMap<>();
+    private Set<String> validRoomTypes = new HashSet<>(Arrays.asList("Deluxe", "Suite", "Penthouse"));
+
+    public UseCase9ErrorHandlingValidation() {
+        // Initialize Inventory
+        inventory.put("Deluxe", 1);
+        inventory.put("Suite", 0); // Out of stock
     }
 
     /**
-     * Generates a summary report for the administrator.
-     * Demonstrates Reporting Readiness and Operational Visibility.
+     * Validates and processes a booking request.
+     * Demonstrates Fail-Fast Design and Guarding System State.
      */
-    public void generateReport() {
-        System.out.println("\n========================================================");
-        System.out.println("        OFFICIAL BOOKING HISTORY REPORT                ");
-        System.out.println("========================================================");
+    public void processBooking(String roomType) throws BookingException {
+        System.out.println("Validating request for: " + roomType);
 
-        if (bookingHistory.isEmpty()) {
-            System.out.println("No records found.");
-        } else {
-            double totalRevenue = 0;
-            for (Reservation res : bookingHistory) {
-                System.out.println(res);
-                totalRevenue += res.totalCost;
-            }
-            System.out.println("--------------------------------------------------------");
-            System.out.println("Total Reservations processed: " + bookingHistory.size());
-            System.out.printf("Total Revenue Generated:      $%.2f\n", totalRevenue);
+        // 1. Validate Input (Case Sensitive as per requirements)
+        if (!validRoomTypes.contains(roomType)) {
+            throw new BookingException("INVALID_ROOM_TYPE: Room type '" + roomType + "' does not exist.");
         }
-        System.out.println("========================================================\n");
+
+        // 2. Validate System State (Inventory Check)
+        int availableCount = inventory.getOrDefault(roomType, 0);
+        if (availableCount <= 0) {
+            throw new BookingException("INSUFFICIENT_INVENTORY: No rooms available for type '" + roomType + "'.");
+        }
+
+        // 3. Commit State Change (Only reached if validations pass)
+        inventory.put(roomType, availableCount - 1);
+        System.out.println("SUCCESS: Room allocated for " + roomType + ". Remaining: " + (availableCount - 1));
     }
 
     public static void main(String[] args) {
-        UseCase8BookingHistoryReport reportService = new UseCase8BookingHistoryReport();
+        UseCase9ErrorHandlingValidation system = new UseCase9ErrorHandlingValidation();
 
-        // Simulating the recording of several completed bookings
-        reportService.recordReservation(
-                "RES-101", "Deluxe", "DEL-101",
-                Arrays.asList("Breakfast", "WiFi"), 180.0
-        );
+        // List of test cases including invalid inputs
+        String[] testRequests = {"Deluxe", "Economy", "Suite", "deluxe"};
 
-        reportService.recordReservation(
-                "RES-102", "Suite", "SUI-201",
-                Arrays.asList("Spa", "Gym"), 450.0
-        );
-
-        reportService.recordReservation(
-                "RES-103", "Deluxe", "DEL-102",
-                new ArrayList<>(), 150.0
-        );
-
-        // Administrator requests the report
-        reportService.generateReport();
+        for (String request : testRequests) {
+            System.out.println("\n--- Processing Request ---");
+            try {
+                system.processBooking(request);
+            } catch (BookingException e) {
+                // Graceful Failure Handling
+                System.err.println("ERROR: " + e.getMessage());
+            } finally {
+                System.out.println("System remains stable. Ready for next request.");
+            }
+        }
     }
 }
