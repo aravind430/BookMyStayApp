@@ -1,99 +1,87 @@
 import java.util.*;
 
-// Represents an individual optional offering
-class Service {
-    String name;
-    double price;
+// Class representing a complete Reservation record for history
+class Reservation {
+    String reservationId;
+    String roomType;
+    String roomId;
+    List<String> services;
+    double totalCost;
 
-    public Service(String name, double price) {
-        this.name = name;
-        this.price = price;
+    public Reservation(String reservationId, String roomType, String roomId, List<String> services, double totalCost) {
+        this.reservationId = reservationId;
+        this.roomType = roomType;
+        this.roomId = roomId;
+        this.services = services;
+        this.totalCost = totalCost;
     }
 
     @Override
     public String toString() {
-        return name + " ($" + price + ")";
+        return String.format("ID: %-15s | Type: %-8s | Room: %-10s | Cost: $%-6.2f | Services: %s",
+                reservationId, roomType, roomId, totalCost, services);
     }
 }
 
-public class UseCase7AddOnServiceSelection {
+public class BookMyStayApp {
 
-    // One-to-Many Relationship: Map reservation ID to a list of services
-    private Map<String, List<Service>> reservationAddOns = new HashMap<>();
+    // List to maintain historical records in insertion order (Audit Trail)
+    private List<Reservation> bookingHistory = new ArrayList<>();
 
-    // Available services in the hotel
-    private Map<String, Service> catalog = new HashMap<>();
-
-    public UseCase7AddOnServiceSelection() {
-        // Initialize Service Catalog
-        catalog.put("BRK", new Service("Breakfast Buffet", 20.0));
-        catalog.put("WFI", new Service("High-Speed WiFi", 10.0));
-        catalog.put("SPA", new Service("Spa Treatment", 50.0));
-        catalog.put("GYM", new Service("Gym Access", 15.0));
+    /**
+     * Records a confirmed reservation into history.
+     * Demonstrates Persistence Mindset and Ordered Storage.
+     */
+    public void recordReservation(String id, String type, String room, List<String> addons, double cost) {
+        Reservation record = new Reservation(id, type, room, addons, cost);
+        bookingHistory.add(record);
+        System.out.println("LOG: Reservation " + id + " saved to history.");
     }
 
     /**
-     * Adds a service to a specific reservation.
-     * Demonstrates Map and List combination.
+     * Generates a summary report for the administrator.
+     * Demonstrates Reporting Readiness and Operational Visibility.
      */
-    public void addServiceToReservation(String reservationId, String serviceCode) {
-        Service service = catalog.get(serviceCode);
+    public void generateReport() {
+        System.out.println("\n========================================================");
+        System.out.println("        OFFICIAL BOOKING HISTORY REPORT                ");
+        System.out.println("========================================================");
 
-        if (service != null) {
-            // Ensure the list exists for this reservation ID
-            reservationAddOns.putIfAbsent(reservationId, new ArrayList<>());
-
-            // Add the service to the list (Composition)
-            reservationAddOns.get(reservationId).add(service);
-            System.out.println("Added " + service.name + " to Reservation: " + reservationId);
+        if (bookingHistory.isEmpty()) {
+            System.out.println("No records found.");
         } else {
-            System.out.println("Service code " + serviceCode + " not found.");
+            double totalRevenue = 0;
+            for (Reservation res : bookingHistory) {
+                System.out.println(res);
+                totalRevenue += res.totalCost;
+            }
+            System.out.println("--------------------------------------------------------");
+            System.out.println("Total Reservations processed: " + bookingHistory.size());
+            System.out.printf("Total Revenue Generated:      $%.2f\n", totalRevenue);
         }
-    }
-
-    /**
-     * Calculates the total additional cost for a reservation.
-     * Demonstrates Cost Aggregation.
-     */
-    public double calculateTotalAddOnCost(String reservationId) {
-        List<Service> services = reservationAddOns.getOrDefault(reservationId, new ArrayList<>());
-        double total = 0;
-        for (Service s : services) {
-            total += s.price;
-        }
-        return total;
-    }
-
-    public void displayReservationSummary(String reservationId) {
-        System.out.println("\n--- Summary for Reservation: " + reservationId + " ---");
-        List<Service> services = reservationAddOns.get(reservationId);
-
-        if (services == null || services.isEmpty()) {
-            System.out.println("No add-on services selected.");
-        } else {
-            System.out.println("Selected Services: " + services);
-            System.out.println("Total Add-On Cost: $" + calculateTotalAddOnCost(reservationId));
-        }
-        System.out.println("------------------------------------------------");
+        System.out.println("========================================================\n");
     }
 
     public static void main(String[] args) {
-        UseCase7AddOnServiceSelection manager = new UseCase7AddOnServiceSelection();
+        UseCase8BookingHistoryReport reportService = new UseCase8BookingHistoryReport();
 
-        // Simulating guest selections for two different reservations
-        String res1 = "RES-DELUXE-101";
-        String res2 = "RES-SUITE-202";
+        // Simulating the recording of several completed bookings
+        reportService.recordReservation(
+                "RES-101", "Deluxe", "DEL-101",
+                Arrays.asList("Breakfast", "WiFi"), 180.0
+        );
 
-        // Guest 1 selects Breakfast and WiFi
-        manager.addServiceToReservation(res1, "BRK");
-        manager.addServiceToReservation(res1, "WFI");
+        reportService.recordReservation(
+                "RES-102", "Suite", "SUI-201",
+                Arrays.asList("Spa", "Gym"), 450.0
+        );
 
-        // Guest 2 selects Spa and Gym
-        manager.addServiceToReservation(res2, "SPA");
-        manager.addServiceToReservation(res2, "GYM");
+        reportService.recordReservation(
+                "RES-103", "Deluxe", "DEL-102",
+                new ArrayList<>(), 150.0
+        );
 
-        // Displaying results
-        manager.displayReservationSummary(res1);
-        manager.displayReservationSummary(res2);
+        // Administrator requests the report
+        reportService.generateReport();
     }
 }
