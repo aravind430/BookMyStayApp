@@ -1,6 +1,6 @@
 import java.util.*;
 
-public class UseCase6RoomAllocationService {
+public class BookMyStayApp{
 
     // Queue to store incoming booking requests (FIFO)
     private Queue<String> bookingQueue = new LinkedList<>();
